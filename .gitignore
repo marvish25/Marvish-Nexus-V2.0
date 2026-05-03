@@ -1,0 +1,21 @@
+# Default ignored files
+/shelf/
+/.idea
+/.vscode
+/.build
+/workspace.xml
+/CMakeLists.txt
+Email_Service.cpp
+
+# Ignored default folder with query files
+/queries/
+/Load_and_unload_data.cpp
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+build/
+*.env
+*.o
+myproject
