@@ -21,7 +21,7 @@ const std::string YELLOW  = "\033[33m";
 const std::string GREEN   = "\033[32m";
 struct Details
 {
-    std::string first_name,last_name,ID, password, salt_value , app_id;
+    std::string first_name,last_name,ID, password, salt_value , app_id,role;
     bool online;            // This variable is not being used yet.
 };
 

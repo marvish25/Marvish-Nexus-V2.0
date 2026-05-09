@@ -6,11 +6,13 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
-
+#include <mutex>
+#include <curl/curl.h>
 #include "crow_all.h"
 #include "user_authentication.hpp"
 #include "Email_Service.hpp"
 
+std::mutex mtx; // For thread-safe logging
 struct CorsMiddleware
 {
     struct context {};
@@ -68,7 +70,15 @@ void engage_mitm(std::string target_ip, std::string gateway_ip) {
     system(cmd2.c_str());
 }
 
-
+size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* s) {
+    size_t newLength = size * nmemb;
+    try {
+        s->append((char*)contents, newLength);
+    } catch (std::bad_alloc& e) {
+        return 0;
+    }
+    return newLength;
+}
 
 
 int main() {
@@ -76,27 +86,9 @@ int main() {
     std::thread refresh_db(&Data::reload_Users, &system_interface.Modify_Storage_Obj());
 
     crow::App<CorsMiddleware> app;
-
-    
-
-
     
 crow::mustache::set_base("templates");
 
-CROW_ROUTE(app, "/api/v1/download/<string>")
-([](std::string file_id) {
-    
-    std::string filePath = "/home/marvish/nexus_assets/" + file_id + ".pdf";
-    
-    crow::response res;
-    res.set_static_file_info(filePath);
-    
-    // Set headers so the browser knows it's a file download
-    res.set_header("Content-Disposition", "attachment; filename=" + file_id + ".pdf");
-    res.set_header("Content-Type", "application/octet-stream");
-    
-    return res;
-});
 // 2. Fix the Static Route to look inside that same templates folder
 CROW_ROUTE(app, "/static/<string>")
 ([](std::string filename) {
@@ -113,52 +105,65 @@ CROW_ROUTE(app, "/static/<string>")
         return crow::response(page.render()); 
     });
     CROW_ROUTE(app, "/register.html")([] {
+        std::lock_guard<std::mutex> lock(mtx);
         auto page = crow::mustache::load("register.html");
         return crow::response(page.render());
     });
-    CROW_ROUTE(app, "/admin.html")([] {
-        auto page = crow::mustache::load("admin.html");
-        return crow::response(page.render()); 
-    });
-     CROW_ROUTE(app, "/student.html")([] {
-        auto page = crow::mustache::load("student.html");
-        return crow::response(page.render()); 
-    });
+    
     CROW_ROUTE(app, "/index.html")([] {
         auto page = crow::mustache::load("index.html");
         return crow::response(page.render()); 
     });
     CROW_ROUTE(app,"/favicon.ico") ([] {return "";});
+
+
+
+
     // ... rest of My routes ...
     // --- AI NEURAL INTERFACE (Ollama) ---
-    CROW_ROUTE(app, "/api/v1/ai/interrogate").methods("POST"_method)([](const crow::request& req) {
-        auto body = crow::json::load(req.body);
-        if (!body || !body.has("query")) return crow::response(400, "Incomplete Request");
-        
-        std::string user_query = body["query"].s();
-        std::string cmd = "curl -s -m 5 http://localhost:11434/api/generate -d '{\"model\": \"tinyllama\", \"prompt\": \"" + user_query + "\", \"stream\": false}'";
-        
-        std::string result = "";
-        char buffer[128];
-        FILE* pipe = popen(cmd.c_str(), "r");
-        if (pipe) {
-            while (fgets(buffer, sizeof(buffer), pipe) != NULL) result += buffer;
-            pclose(pipe);
-        }
+    
 
-        if (result.empty()) return crow::response(200, "Neural Link Offline: Ensure Ollama is running.");
+CROW_ROUTE(app, "/api/v1/ai/interrogate").methods("POST"_method)([](const crow::request& req) {
+    auto body = crow::json::load(req.body);
+    if (!body || !body.has("query")) return crow::response(400, "Incomplete Request");
+    
+    std::string user_query = body["query"].s();
+    
+    // 1. Remove the '-m 5' and use 127.0.0.1 to avoid DNS issues
+    // 2. We use 'single quotes' for the outer shell command to avoid escaping nightmares
+    // Instead of just passing user_query, wrap it in a strict instruction
+    std::string system_instruction = "<|system|>Instruction: Your name is MARVISH AI the MARVISH_NEXUS kernel assistant Be brief. One sentence only. Do not market the system. Do not explain your role. Response must be under 20 words.</s><|user|>Why are you showing instructions?</s><|assistant|>";
 
-        auto ai_json = crow::json::load(result);
-        if (!ai_json) return crow::response(200, "Neural Link Error: Malformed data.");
+    std::string formatted_query = system_instruction + user_query;
 
-        std::string response_text = "Neural Link Timeout.";
-        if (ai_json.has("response")) response_text = ai_json["response"].s();
+    std::string cmd = "curl -s http://127.0.0.1:11434/api/generate -d \"{\\\"model\\\": \\\"tinyllama\\\", \\\"prompt\\\": \\\"" + formatted_query + "\\\", \\\"stream\\\": false}\"";
+    
+    
+    std::string result = "";
+    char buffer[128];
+    FILE* pipe = popen(cmd.c_str(), "r");
+    
+    if (pipe) {
+        while (fgets(buffer, sizeof(buffer), pipe) != NULL) result += buffer;
+        pclose(pipe);
+    }
 
-        return crow::response(200, response_text);
-    });
+    // DEBUG: Print result to your terminal so you can see what Ollama is actually saying
+    std::cout << "Ollama Raw Output: " << result << std::endl;
 
+    if (result.empty()) {
+        return crow::response(200, "Neural Link Offline: Check if 'ollama serve' is running in another terminal.");
+    }
+
+    auto ai_json = crow::json::load(result);
+    if (!ai_json || !ai_json.has("response")) {
+        return crow::response(200, "Neural Link Error: Ollama sent invalid data.");
+    }
+
+    return crow::response(200, ai_json["response"].s());
+});
     // --- THE NEW APP-ID FILTERING ROUTE ---
-    CROW_ROUTE(app, "/api/v1/users/<string>")([&](const crow::request& req, std::string target_app_id){
+    CROW_ROUTE(app, "/api/v1/users/<string>")([&](const crow::request& req, std::string target_app_id){ 
         log_nexus_activity(req, "FILTER_SCAN_ON_" + target_app_id);
         std::vector<crow::json::wvalue> filtered_list;
         auto &users = system_interface.get_storage_obj().get_manager().get_Users();
@@ -167,7 +172,7 @@ CROW_ROUTE(app, "/static/<string>")
                 crow::json::wvalue node;
                 node["id"] = u.ID;
                 node["app_id"] = u.app_id;
-                node["access_level"] = (u.ID == "marvish26@hotmail.com") ? "ROOT_ADMIN" : "OPERATOR";
+                node["access_level"] = u.role;
                 filtered_list.push_back(std::move(node));
             }
         }
@@ -189,6 +194,7 @@ CROW_ROUTE(app, "/static/<string>")
         x["logs"] = std::move(log_lines);
         return x;
     });
+    
 
 CROW_ROUTE(app, "/api/v1/login").methods(crow::HTTPMethod::POST, crow::HTTPMethod::OPTIONS)
 ([&](const crow::request& req) {
@@ -241,6 +247,7 @@ CROW_ROUTE(app, "/api/v1/login").methods(crow::HTTPMethod::POST, crow::HTTPMetho
             std::string uId   = x["userId"].s();
             std::string uPw   = x["userPassword"].s();
             std::string aId   = x["appId"].s();
+            std::string role  = x["role"].s();
 
             // Interfacing with the Marvish Nexus Kernel
             Status result = system_interface.Sign_In(fName, lName, uId, uPw, aId);
@@ -265,7 +272,7 @@ CROW_ROUTE(app, "/api/v1/login").methods(crow::HTTPMethod::POST, crow::HTTPMetho
         for (const auto &u : users) {
             crow::json::wvalue node;
             node["id"] = u.ID;
-            node["access_level"] = (u.ID == "marvish26@hotmail.com") ? "ROOT_ADMIN" : "OPERATOR";
+            node["access_level"] = u.role;
             user_list.push_back(std::move(node));
         }
         crow::json::wvalue x;
@@ -297,8 +304,8 @@ CROW_ROUTE(app, "/api/v1/login").methods(crow::HTTPMethod::POST, crow::HTTPMetho
         return crow::response(200, result); 
     });
 
-    // Ensure it binds to 0.0.0.0 for the tunnel
-    app.port(8080).bindaddr("127.0.0.1").multithreaded().run();
+    
+    app.port(8080).bindaddr("0.0.0.0").multithreaded().run();
     
     if (refresh_db.joinable()) refresh_db.join();
     return 0;
