@@ -161,7 +161,7 @@ Status user_authentication::LogIn(const std::string& app_id,const std::string& U
     {
         input_hash = hash_func(User_password + user.salt_value);
 
-        if(user.ID == "marvish26@hotmail.com"){
+        if(user.role == "super_admin"){
             user.app_id = app_id;
         }
         
