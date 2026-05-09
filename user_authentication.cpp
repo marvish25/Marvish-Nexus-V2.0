@@ -65,7 +65,7 @@ Status user_authentication::Scan_ID(const std::string ID)
 }
 Status user_authentication::Sign_In( std::string firstName ,std::string lastName ,std::string userId , std::string userPassword , std::string appId)
 {
-    
+        std::string role = "user";
         std::cout << "\nfN : "<< firstName << "\nLN :"<<lastName<<"\nU_ID:"<<userId<<"\nU_pw :"<< userPassword<<"\nAPPid:"<< appId<<"\n";
         for(auto& user : Modify_Storage_Obj().Modify_Manager_Obj().Modify_Users())
         {
@@ -100,7 +100,8 @@ Status user_authentication::Sign_In( std::string firstName ,std::string lastName
                                                                     std::move(userId),
                                                                     std::move(secure_hash),
                                                                     std::move(temp_salt),
-                                                                    std::move(appId)
+                                                                    std::move(appId),
+                                                                    std::move(role)
         });
         storage_obj.to_db();
         
@@ -110,7 +111,7 @@ Status user_authentication::Sign_In( std::string firstName ,std::string lastName
 
 Status user_authentication::check_password(const std::string& confirm_pw,const std::string& temp_pw)
 {
-    std::string strong_pw = "!@#$%&:;";
+    std::string strong_pw = "!@#$%&";
     bool pass_strength = false;
     int count = 0;
     //std::string temp_salt = salt();

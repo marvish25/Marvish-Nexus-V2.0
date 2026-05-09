@@ -111,6 +111,7 @@ CROW_ROUTE(app, "/static/<string>")
     });
     
     CROW_ROUTE(app, "/index.html")([] {
+        std::lock_guard<std::mutex> lock(mtx);
         auto page = crow::mustache::load("index.html");
         return crow::response(page.render()); 
     });
@@ -124,6 +125,7 @@ CROW_ROUTE(app, "/static/<string>")
     
 
 CROW_ROUTE(app, "/api/v1/ai/interrogate").methods("POST"_method)([](const crow::request& req) {
+    std::lock_guard<std::mutex> lock(mtx); // Ensure thread-safe access to logs and system resources
     auto body = crow::json::load(req.body);
     if (!body || !body.has("query")) return crow::response(400, "Incomplete Request");
     
@@ -164,6 +166,7 @@ CROW_ROUTE(app, "/api/v1/ai/interrogate").methods("POST"_method)([](const crow::
 });
     // --- THE NEW APP-ID FILTERING ROUTE ---
     CROW_ROUTE(app, "/api/v1/users/<string>")([&](const crow::request& req, std::string target_app_id){ 
+        std::lock_guard<std::mutex> lock(mtx); // Ensure thread-safe access to logs and system resources
         log_nexus_activity(req, "FILTER_SCAN_ON_" + target_app_id);
         std::vector<crow::json::wvalue> filtered_list;
         auto &users = system_interface.get_storage_obj().get_manager().get_Users();
@@ -197,9 +200,12 @@ CROW_ROUTE(app, "/api/v1/ai/interrogate").methods("POST"_method)([](const crow::
     
 
 CROW_ROUTE(app, "/api/v1/login").methods(crow::HTTPMethod::POST, crow::HTTPMethod::OPTIONS)
+
 ([&](const crow::request& req) {
     crow::response res;
     
+    std::lock_guard<std::mutex> lock(mtx); // Ensure thread-safe access to logs and system resources
+    log_nexus_activity(req, "LOGIN_ATTEMPT");
     // Manually attach headers here to be 100% sure
     res.set_header("Access-Control-Allow-Origin", "*");
     res.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -247,7 +253,7 @@ CROW_ROUTE(app, "/api/v1/login").methods(crow::HTTPMethod::POST, crow::HTTPMetho
             std::string uId   = x["userId"].s();
             std::string uPw   = x["userPassword"].s();
             std::string aId   = x["appId"].s();
-            std::string role  = x["role"].s();
+            
 
             // Interfacing with the Marvish Nexus Kernel
             Status result = system_interface.Sign_In(fName, lName, uId, uPw, aId);
@@ -258,7 +264,7 @@ CROW_ROUTE(app, "/api/v1/login").methods(crow::HTTPMethod::POST, crow::HTTPMetho
                 res["msg"] = "Operator Profile Committed to Nexus.";
                 return crow::response(200, res);
             } else {
-                return crow::response(403, "AUTH_DENIED: Protocol Violation.");
+                return crow::response(403, "Password should have atleast two of these (abcdefghijklmnopqrstuvwxyz!@#$%&:;)");
             }
         } catch (const std::exception& e) {
             return crow::response(500, "KERNEL_PANIC: Data Extraction Failed.");
