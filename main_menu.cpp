@@ -42,7 +42,7 @@ void menu::main_menu()
                 std::cin >> auth.temp_manager.confirm_pw;
                 auth.check_password(auth.temp_manager.temp_pw,auth.temp_manager.confirm_pw);
 
-                if(auth.Sign_In(user) == 200)
+                if(auth.Sign_In(user.first_name,user.last_name,user.ID,auth.temp_manager.temp_pw,auth.temp_manager.confirm_pw) == 200)
                     std::cout << "Success\n";
                 else
                     std::cout << "Failed\n";

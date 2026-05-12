@@ -11,7 +11,7 @@ class user_authentication
 protected:
     
     
-Data storage_obj ;
+DatabaseManager storage_obj ;
 Email_Service email;
 public:
     std::unique_ptr<Details> logged_in_user = std::make_unique<Details>();
@@ -19,11 +19,11 @@ public:
     std::string logged_in_password;         // i should make it private and all the functions that use it as friend functions
     user_manager temp_manager;
 
-    const Data &get_storage_obj() const
+    const DatabaseManager &get_storage_obj() const
     {
         return storage_obj;
     }
-    Data &Modify_Storage_Obj()
+    DatabaseManager &Modify_Storage_Obj()
     {
         return storage_obj;
     }
