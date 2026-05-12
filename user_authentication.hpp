@@ -29,7 +29,7 @@ public:
     }
     bool found = false;
     bool Email_validation(const std::string &email);
-    Status Sign_In(std::string firstName ,std::string lastName ,std::string userId , std::string userPassword , std::string appId);
+    Status Sign_In( std::string username ,std::string email , std::string userPassword , std::string confirm_pw);
     Status LogIn(const std::string& app_id,const std::string& User_id , const std::string& User_password);
     Status Scan_Username(const std::string first_name, const std::string last_name);
     Status Scan_ID(const std::string ID);

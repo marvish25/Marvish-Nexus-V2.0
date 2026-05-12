@@ -8,6 +8,8 @@
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include <pqxx/pqxx>
+#include "nexus_core.hpp"
 #include "config_loader.hpp"
 
 
@@ -21,7 +23,8 @@ const std::string YELLOW  = "\033[33m";
 const std::string GREEN   = "\033[32m";
 struct Details
 {
-    std::string first_name,last_name,ID, password, salt_value , app_id,role;
+    //std::string first_name,last_name,ID, password, salt_value , app_id;
+    std::string dev_id,username,email,password_hash,password_salt,role,timestamp;
     bool online;            // This variable is not being used yet.
 };
 
@@ -61,7 +64,8 @@ public:
             " port=" + config["DB_PORT"];
             
     }
-
+    int Get_Total_Users_For_Dev(int dev_id);
+    bool Register_New_App(const NexusApp& app);
     void view_users();
     void clear_console();
     void search_user(const std::string &search_id);

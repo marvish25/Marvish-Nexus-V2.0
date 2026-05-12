@@ -28,21 +28,18 @@ void menu::main_menu()
             switch (choice_str[0])
             {
             case '1':
-                std::cout << "ente first name :";
-                std::cin >> user.first_name;
-                std::cout << "enter last name :";
-                std::cin >> user.last_name;
-                std::cout <<auth.Scan_Username(user.first_name,user.last_name) << "\n";
+                std::cout << "enter username :";
+                std::cin >> user.username;
                 std::cout << "enter email :";
-                std::cin >> user.ID;
-                auth.Scan_ID(user.ID);
+                std::cin >> user.email;
+                auth.Scan_ID(user.email);
                 std::cout << "enter password :";
                 std::cin >> auth.temp_manager.temp_pw;
                 std::cout << "enter confirm password :";
                 std::cin >> auth.temp_manager.confirm_pw;
                 auth.check_password(auth.temp_manager.temp_pw,auth.temp_manager.confirm_pw);
 
-                if(auth.Sign_In(user.first_name,user.last_name,user.ID,auth.temp_manager.temp_pw,auth.temp_manager.confirm_pw) == 200)
+                if(auth.Sign_In(user.username,user.email,auth.temp_manager.temp_pw,auth.temp_manager.confirm_pw) == 200)
                     std::cout << "Success\n";
                 else
                     std::cout << "Failed\n";
@@ -105,7 +102,7 @@ void menu::user_menu()
     {
 
         std::cout << "\n\033[1m__________________________________\033[0m\n";
-        std::cout << "          \033[32m ⬵WELCOME " << auth.logged_in_user->first_name << "\033[0m\n";
+        std::cout << "          \033[32m ⬵WELCOME " << auth.logged_in_user->username << "\033[0m\n";
         std::cout << "\033[1m***********************************\033[1m\n";
         std::cout << "1. Delete Account\n";
         std::cout << "2. Reset password\n";

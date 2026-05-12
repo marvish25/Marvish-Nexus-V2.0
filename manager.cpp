@@ -1,9 +1,62 @@
 #define PQXX_HAVE_SOURCE_LOCATION 0
-#include <pqxx/pqxx>
 #include "manager.hpp"
 #include <iomanip>
 
 
+int user_manager::Get_Total_Users_For_Dev(int dev_id) {
+    try {
+
+        pqxx::connection C(conn_str());
+        if (!C.is_open()) {
+            std::cerr << "DB_CONNECTION_ERROR: Unable to connect to the database" <<"\n";
+            return 0;
+        }
+        // This SQL query joins the apps and users to get a grand total
+        std::string query = 
+            "SELECT COUNT(u.user_id) "
+            "FROM nexus_users u "
+            "JOIN nexus_apps a ON u.app_id = a.app_id "
+            "WHERE a.owner_id = " + std::to_string(dev_id) + ";";
+
+        
+        pqxx::work W(C);
+        pqxx::result R = W.exec(query);
+        
+        // Return the count (first row, first column)
+        return R[0][0].as<int>();
+        
+    } catch (const std::exception& e) {
+        std::cerr << "CORE_ERROR: Failed to fetch user metrics: " << e.what() << std::endl;
+        return 0; // Return 0 if the query fails
+    }
+}
+
+
+bool user_manager::Register_New_App(const NexusApp& app) {
+    try {
+
+        pqxx::connection C(conn_str());
+        if (!C.is_open()) { 
+            std::cerr << "DB_CONNECTION_ERROR: Unable to connect to the database" << std::endl;
+            return false;
+        }
+        // We explicitly define the columns to ensure 'name' doesn't end up in 'id'
+        std::string query = "INSERT INTO nexus_apps (app_id,owner_id,app_name) VALUES ('"
+            + app.app_id + "', "
+            + "'" + std::to_string(app.owner_id) + "', "
+            + "'" + app.name+ "');";
+            
+
+        // Execute using your PQXX worker
+        pqxx::work W(C);
+        W.exec(query);
+        W.commit();
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "DB_INSERT_ERROR: " << e.what() << std::endl;
+        return false;
+    }
+}
 void user_manager::remove_user(const std::string& delete_id)
 {
     std::lock_guard<std::mutex> lock(mtx);
@@ -48,7 +101,7 @@ void user_manager::view_users()
     {
         size++;
         
-        std::cout << "                                                                             | " << std::left << std::setw(30) << user.first_name+" "+user.last_name<< " | " << std::left << std::setw(30) << user.ID << " |\n";
+        std::cout << "                                                                             | " << std::left << std::setw(30) << user.username<< " | " << std::left << std::setw(30) << user.email << " |\n";
         std::cout << "                                                                             | " << std::setw(30) << " "<< " | " << std::setw(30) <<" "<<" |\n";
     }
     std::cout << "                                                                             *******************************************************************\n";
@@ -60,13 +113,13 @@ void user_manager::view_users()
 void user_manager::search_user(const std::string &search_id)
 {
     std::lock_guard<std::mutex> lock(mtx);
-    auto it = std::find_if(Users.begin(),Users.end(),[&search_id](const Details &ID){return ID.ID == search_id;});
+    auto it = std::find_if(Users.begin(),Users.end(),[&search_id](const Details &ID){return ID.email == search_id;});
 
     if(it != Users.end())
     {
         std::cout <<GREEN<< "[ User found ]\n"<<RESET;
-        std::cout << "Name : " <<it->first_name <<"\n";
-        std::cout << "Email: " <<it->ID <<"\n";
+        std::cout << "Name : " <<it->username <<"\n";
+        std::cout << "Email: " <<it->email <<"\n";
     }
     else{
         std::cout <<RED<<" [ User not found ! ]\n"<<RESET;
