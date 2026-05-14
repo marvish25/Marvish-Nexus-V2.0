@@ -2,10 +2,10 @@
 #include <random>
 #include <string>
 
-int count = 7;
+
 std::string user_authentication::salt()
 {
-    // count =7;
+    int count =7;
     std::string salt;
 
 
@@ -52,7 +52,7 @@ Status user_authentication::Scan_ID(const std::string ID)
     }
     for (auto user : storage_obj.get_manager().get_Users())
     {
-        if (ID == user.ID)
+        if (ID == user.email)
         {
             
             found = true;
@@ -63,45 +63,44 @@ Status user_authentication::Scan_ID(const std::string ID)
         
     return SUCCESS;
 }
-Status user_authentication::Sign_In( std::string firstName ,std::string lastName ,std::string userId , std::string userPassword , std::string appId)
+Status user_authentication::Sign_In( std::string username ,std::string email , std::string userPassword , std::string confirm_pw)
 {
-        std::string role = "user";
-        std::cout << "\nfN : "<< firstName << "\nLN :"<<lastName<<"\nU_ID:"<<userId<<"\nU_pw :"<< userPassword<<"\nAPPid:"<< appId<<"\n";
+        
+        std::cout << "\nUsername : "<< username <<"\nEmail:"<<email<<"\nU_pw :"<< userPassword<<"\n";
         for(auto& user : Modify_Storage_Obj().Modify_Manager_Obj().Modify_Users())
         {
-            if(user.ID == userId)
+            if(user.email == email)
             {
                 std::cout << "user already exists\n";
                 return ERR_USER_FOUND;
             }
         }
         std::string temp_salt = salt();
-        temp_manager.temp_pw = userPassword;
-        temp_manager.confirm_pw = temp_manager.temp_pw;
-        switch(check_password(temp_manager.confirm_pw,temp_manager.temp_pw))
+        
+        switch(check_password(confirm_pw,userPassword))
         {
             case 201:
                 return ERR_PASS_DONT_MATCH;
             case 202:
-                return ERR_WEAK_PASS;
+                //return ERR_WEAK_PASS;
+                std::cout << "weak password\n";
             
         }
 
-        if(appId.empty()){
-            appId = "null_app";
-        }
-
-        temp_manager.confirm_pw = temp_manager.confirm_pw + temp_salt;
         
-        std::string secure_hash = hash_func(temp_manager.confirm_pw);
+        userPassword = confirm_pw + temp_salt;
+        
+        std::string secure_hash = hash_func(userPassword);
+        std::cout <<"[DEBUG] Generated salt: " << temp_salt << "\n";
+        std::cout <<"[DEBUG] Hashed password with salt: " << secure_hash << "\n";
 
-        storage_obj.Modify_Manager_Obj().Modify_Users().push_front({std::move(firstName),
-                                                                    std::move(lastName),
-                                                                    std::move(userId),
+        storage_obj.Modify_Manager_Obj().Modify_Users().push_front({-1,
+                                                                    std::move(username),
+                                                                    std::move(email),
                                                                     std::move(secure_hash),
                                                                     std::move(temp_salt),
-                                                                    std::move(appId),
-                                                                    std::move(role)
+                                                                    
+                                                                    
         });
         storage_obj.to_db();
         
@@ -155,18 +154,18 @@ Status user_authentication::LogIn(const std::string& app_id,const std::string& U
     
     std::cout << "app_id    : "<< app_id <<"\n";
     std::cout << "User ID   : "<< User_id <<"\n";
+    std::cout << "Password  : "<< User_password <<"\n";
+    
     
     
     
     for (auto user : storage_obj.get_manager().get_Users())
     {
-        input_hash = hash_func(User_password + user.salt_value);
-
-        if(user.role == "super_admin"){
-            user.app_id = app_id;
-        }
         
-        if (User_id == user.ID && input_hash == user.password && user.app_id == app_id)
+        input_hash = hash_func(User_password + user.password_salt);
+
+                
+        if (User_id == user.email && input_hash == user.password_hash)
         {
             
             found = true;
@@ -174,10 +173,11 @@ Status user_authentication::LogIn(const std::string& app_id,const std::string& U
             *logged_in_user = user;
             return SUCCESS;
         }
-        else if (User_id == user.ID && input_hash != user.password && user.app_id == app_id)
+        else if (User_id == user.email && input_hash != user.password_hash )
         {
 
             //store the login attempts in a database and reset them afte 12 hours.
+            
             return ERR_WRONG_PASS;
 
         }
@@ -202,9 +202,9 @@ bool user_authentication::Email_validation(const std::string &email) {
 Status user_authentication::reset_password(const std::string confirm_pw , const std::string temp_password)
 {
 
-    std::string input_hash = hash_func(temp_manager.temp_pw + logged_in_user->salt_value);
-
-    if (input_hash != logged_in_user->password)
+    std::string input_hash = hash_func(temp_manager.temp_pw + logged_in_user->password_salt);
+    
+    if (input_hash != logged_in_user->password_hash)
     {
         return ERR_WRONG_PASS;
     }
@@ -218,14 +218,14 @@ Status user_authentication::reset_password(const std::string confirm_pw , const 
     }
     
 
-    logged_in_user->password = input_hash;
+    logged_in_user->password_hash = input_hash;
     
     for (auto &user : storage_obj.Modify_Manager_Obj().Modify_Users())
     {
-        if (user.ID == logged_in_user->ID)
+        if (user.email == logged_in_user->email)
         {
-            user.salt_value = salt();
-            user.password = hash_func(temp_manager.confirm_pw+user.salt_value);
+            user.password_salt = salt();
+            user.password_hash = hash_func(temp_manager.confirm_pw+user.password_salt);
             break;
         }
 
@@ -239,7 +239,7 @@ Status user_authentication::reset_password(const std::string confirm_pw , const 
 
 Status user_authentication::delete_account()
 {
-    storage_obj.Modify_Manager_Obj().remove_user(logged_in_user->ID);
+    storage_obj.remove_user(logged_in_user->email);
     storage_obj.from_db();
     return SUCCESS;
 }
@@ -250,7 +250,7 @@ void user_authentication::verify_logged_in_user()
     // For example, checking if the user still exists in the system or if their data has been tampered with
     while(true)
     {
-        if(logged_in_user->password != logged_in_password)
+        if(logged_in_user->password_hash != logged_in_password)
         {
             std::cout << RED << "[ User verification failed ]\n" << RESET;
             return;
