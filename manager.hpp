@@ -10,7 +10,8 @@
 #include <mutex>
 #include <pqxx/pqxx>
 #include "nexus_core.hpp"
-#include "config_loader.hpp"
+
+
 
 
 
@@ -21,18 +22,33 @@ const std::string CYAN    = "\033[36m";
 const std::string GREY    = "\033[90m";
 const std::string YELLOW  = "\033[33m";
 const std::string GREEN   = "\033[32m";
+
+
+enum Status {
+    SUCCESS = 200,
+    ERR_NOT_FOUND = 404,
+    ERR_WRONG_PASS = 401,
+    ERR_DB_DOWN = 500,
+    ERR_PASS_DONT_MATCH = 201,
+    ERR_WEAK_PASS = 202,
+    ERR_USER_FOUND = 203,
+    ERR_INVALID_ID = 204,
+    ERR_CONFIG_MISSING = 501
+};
+
 struct Details
 {
-    //std::string first_name,last_name,ID, password, salt_value , app_id;
-    std::string dev_id,username,email,password_hash,password_salt,role,timestamp;
+    int dev_id;             // This is the unique identifier for each user, it can be generated using a simple counter or a UUID generator.
+    std::string username,email,password_hash,password_salt,role,timestamp;
+    
+
     bool online;            // This variable is not being used yet.
 };
 
 class user_manager
 {
-    
-    config_loader conf;
     std::list<Details> Users; // the list of the users
+    std::list<NexusApp> Apps; // the list of the apps
 public:
     
     std::string temp_pw,temp_id, temp_pn,temp_salt,temp_pn1, confirm_pw;
@@ -48,28 +64,20 @@ public:
         return Users;
     }
 
-    const config_loader &get_config() const
+    const std::list<NexusApp> &get_Apps() const
     {
-        return conf;
+        return Apps;
     }
-    std::string conn_str()
+
+    std::list<NexusApp> &Modify_Apps()
     {
-        auto config = get_config().load_config("config.env");
-        
-        return
-            "dbname=" + config["DB_NAME"] +
-            " user=" + config["DB_USER"] +
-            " password=" + config["DB_PASSWORD"] +
-            " hostaddr="  + config["DB_HOST"] +
-            " port=" + config["DB_PORT"];
-            
-    }
-    int Get_Total_Users_For_Dev(int dev_id);
-    bool Register_New_App(const NexusApp& app);
+        return Apps;
+    }   
+   
     void view_users();
     void clear_console();
     void search_user(const std::string &search_id);
-    void remove_user(const std::string& delete_id);
+    
 
     user_manager() = default;
 

@@ -1,6 +1,6 @@
 #include "config_loader.hpp"
-#include <iostream>
-#include <string>
+
+
 std::unordered_map<std::string, std::string> config_loader::load_config(const std::string& filename)
 {
     std::unordered_map<std::string, std::string> config;

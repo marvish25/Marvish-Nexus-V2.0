@@ -94,7 +94,7 @@ Status user_authentication::Sign_In( std::string username ,std::string email , s
         std::cout <<"[DEBUG] Generated salt: " << temp_salt << "\n";
         std::cout <<"[DEBUG] Hashed password with salt: " << secure_hash << "\n";
 
-        storage_obj.Modify_Manager_Obj().Modify_Users().push_front({"-1",
+        storage_obj.Modify_Manager_Obj().Modify_Users().push_front({-1,
                                                                     std::move(username),
                                                                     std::move(email),
                                                                     std::move(secure_hash),
@@ -239,7 +239,7 @@ Status user_authentication::reset_password(const std::string confirm_pw , const 
 
 Status user_authentication::delete_account()
 {
-    storage_obj.Modify_Manager_Obj().remove_user(logged_in_user->email);
+    storage_obj.remove_user(logged_in_user->email);
     storage_obj.from_db();
     return SUCCESS;
 }
